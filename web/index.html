@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pet Camera</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 1rem; max-width: 900px; margin-inline: auto; }
+  h1 { font-size: 1.25rem; margin: 0 0 .75rem; }
+  #stream-wrap { background: #000; aspect-ratio: 16/9; display: grid; place-items: center; border-radius: 8px; overflow: hidden; }
+  #stream-wrap img { width: 100%; height: 100%; object-fit: contain; }
+  .status { font-size: .85rem; color: #888; margin: .5rem 0 1rem; }
+  .clips { list-style: none; padding: 0; margin: 0; border-top: 1px solid #3333; }
+  .clip { display: flex; align-items: center; gap: .75rem; padding: .5rem 0; border-bottom: 1px solid #3333; }
+  .clip .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .clip .meta { color: #888; font-size: .8rem; }
+  button { font: inherit; padding: .4rem .75rem; border-radius: 6px; border: 1px solid #8888; background: transparent; cursor: pointer; }
+  button:hover { background: #8883; }
+  button.danger { color: #c33; }
+  dialog { max-width: 90vw; border: none; border-radius: 8px; padding: 0; background: #000; }
+  dialog video { display: block; max-width: 90vw; max-height: 80vh; }
+  .dialog-head { display: flex; justify-content: space-between; align-items: center; padding: .5rem; background: #222; color: #eee; }
+</style>
+</head>
+<body>
+  <h1>🐾 Pet Camera</h1>
+  <div id="stream-wrap"><img src="/stream.mjpg" alt="live"></div>
+  <div class="status" id="status">読み込み中…</div>
+
+  <h2 style="font-size:1rem;margin:.5rem 0;">録画クリップ</h2>
+  <ul class="clips" id="clips"></ul>
+
+  <dialog id="player">
+    <div class="dialog-head"><span id="player-title"></span><button onclick="closePlayer()">閉じる</button></div>
+    <video id="player-video" controls></video>
+  </dialog>
+
+<script>
+const clipsEl = document.getElementById("clips");
+const statusEl = document.getElementById("status");
+const dialog = document.getElementById("player");
+const video = document.getElementById("player-video");
+const playerTitle = document.getElementById("player-title");
+
+function fmtBytes(n) {
+  const u = ["B","KB","MB","GB"]; let i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return n.toFixed(1) + " " + u[i];
+}
+
+async function refreshStatus() {
+  try {
+    const r = await fetch("/api/status");
+    const s = await r.json();
+    statusEl.textContent =
+      `カメラ: ${s.camera.running ? "●" : "○"} ${s.camera.width}x${s.camera.height} / ` +
+      `録画: ${s.storage.clip_count}件 (${fmtBytes(s.storage.total_bytes)})`;
+  } catch (e) { statusEl.textContent = "status unavailable"; }
+}
+
+async function refreshClips() {
+  const r = await fetch("/api/clips");
+  const clips = await r.json();
+  clipsEl.innerHTML = "";
+  for (const c of clips) {
+    const li = document.createElement("li"); li.className = "clip";
+    const name = document.createElement("div"); name.className = "name";
+    const t = new Date(c.created_at).toLocaleString();
+    name.innerHTML = `<div>${c.filename}</div><div class="meta">${t} · ${fmtBytes(c.size_bytes)}</div>`;
+    const play = document.createElement("button"); play.textContent = "▶";
+    play.onclick = () => openPlayer(c.filename);
+    const del = document.createElement("button"); del.textContent = "削除"; del.className = "danger";
+    del.onclick = () => deleteClip(c.filename);
+    li.append(name, play, del); clipsEl.append(li);
+  }
+}
+
+function openPlayer(filename) {
+  playerTitle.textContent = filename;
+  video.src = `/api/clips/${encodeURIComponent(filename)}`;
+  dialog.showModal(); video.play();
+}
+function closePlayer() { video.pause(); video.src = ""; dialog.close(); }
+
+async function deleteClip(filename) {
+  if (!confirm(`${filename} を削除しますか？`)) return;
+  const r = await fetch(`/api/clips/${encodeURIComponent(filename)}`, { method: "DELETE" });
+  if (r.ok) refreshAll();
+}
+
+function refreshAll() { refreshStatus(); refreshClips(); }
+refreshAll();
+setInterval(refreshAll, 5000);
+</script>
+</body>
+</html>
