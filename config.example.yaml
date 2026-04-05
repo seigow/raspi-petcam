@@ -1,0 +1,23 @@
+camera:
+  width: 1280
+  height: 720
+  framerate: 15
+
+motion:
+  enabled: true
+  threshold: 25       # smaller = more sensitive
+  min_area: 5000      # contour area in px² to trigger
+  cooldown_sec: 10    # suppress repeat triggers
+
+recording:
+  output_dir: ./recordings
+  segment_sec: 60     # length of one clip
+  pre_buffer_sec: 3   # (reserved for future use)
+
+storage:
+  max_total_gb: 10
+  retain_days: 7
+
+server:
+  host: 0.0.0.0
+  port: 8000

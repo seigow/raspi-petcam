@@ -1,0 +1,15 @@
+[Unit]
+Description=Pet Camera (petcam)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/raspi-petcam
+ExecStart=/home/pi/.local/bin/uv run python -m petcam.main
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
